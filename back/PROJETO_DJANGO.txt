@@ -1,0 +1,94 @@
+1 - Criar o Ambiente Virtual:
+	python -m venv venv
+
+	
+2 - Alterar a Política para Permitir Scripts
+	Set-ExecutionPolicy -Scope CurrentUser -ExecutionPolicy RemoteSigned
+ 	
+	
+3 - Ative o ambiente virtual:	
+	venv\Scripts\activate
+	
+4 - Instale o Django e o Django REST Framework:
+	pip install django djangorestframework
+
+5 - Crie um novo projeto:
+	django-admin startproject martsmart_backend
+
+6 - Dentro do projeto ( onde esta o manage.py ), crie um app chamado core:
+	python manage.py startapp core
+	
+7 - Crie um app chamado users
+	python manage.py startapp users
+	
+8 - Criar um Serializer para o Usuário
+	# users/serializers.py
+from django.contrib.auth.models import User
+from rest_framework import serializers
+
+class UserSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = User
+        fields = ['id', 'username', 'email', 'password']
+        extra_kwargs = {'password': {'write_only': True}}
+
+    def create(self, validated_data):
+        user = User.objects.create_user(
+            username=validated_data['username'],
+            email=validated_data['email'],  
+            password=validated_data['password']
+        )
+        return user
+	
+9 - Criar as Views de Registro e Login
+	# users/views.py
+	from django.contrib.auth import authenticate
+	from rest_framework import status
+	from rest_framework.decorators import api_view
+	from rest_framework.response import Response
+	from .serializers import UserSerializer
+	from rest_framework_simplejwt.tokens import RefreshToken
+
+	# View de Registro de Usuário
+	@api_view(['POST'])
+	def register(request):
+		if request.method == 'POST':
+			serializer = UserSerializer(data=request.data)
+			if serializer.is_valid():
+				serializer.save()
+				return Response(serializer.data, status=status.HTTP_201_CREATED)  # Retorna os dados do novo usuário
+			return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+	# View de Login de Usuário
+	@api_view(['POST'])
+	def login_view(request):
+		email = request.data.get('email')
+		password = request.data.get('password')
+
+		# Verifica se o usuário existe e as credenciais são válidas
+		user = authenticate(request, username=email, password=password)
+		if user is not None:
+			# Gera o token JWT
+			refresh = RefreshToken.for_user(user)
+			return Response({
+				'access': str(refresh.access_token),
+				'refresh': str(refresh),
+			})
+		return Response({'error': 'Credenciais inválidas'}, status=400)
+		
+		
+10- Configurar as URLs da API	
+	from django.urls import path
+	from . import views
+
+	urlpatterns = [
+		path('register/', views.register, name='register'),
+		path('login/', views.login_view, name='login'),
+	]
+
+		
+
+
+11 - Instalar o djangorestframework-simplejwt
+	 pip install djangorestframework-simplejwt
+	
